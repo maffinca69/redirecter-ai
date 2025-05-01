@@ -57,8 +57,8 @@ func (e *httpError) Error() string {
 
 // Метрики
 var (
-	requestsTotal = expvar.NewInt("requests_total")
-	requestErrors = expvar.NewMap("request_errors")
+	requestsTotal = expvar.NewInt("proxy_requests_total")
+	requestErrors = expvar.NewMap("proxy_request_errors")
 )
 
 // Буферизированный writer ответов
@@ -173,6 +173,15 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func init() {
+	// Инициализация метрик памяти с уникальным именем
+	expvar.Publish("proxy_memstats", expvar.Func(func() interface{} {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		return m
+	}))
+}
+
 func main() {
 	// Инициализация HTTP/2
 	http.DefaultTransport.(*http.Transport).DialContext = (&net.Dialer{
@@ -184,13 +193,6 @@ func main() {
 	if err := http2.ConfigureTransport(http.DefaultTransport.(*http.Transport)); err != nil {
 		log.Fatalf("Failed to configure HTTP/2: %v", err)
 	}
-
-	// Метрики памяти
-	expvar.Publish("memstats", expvar.Func(func() interface{} {
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-		return m
-	}))
 
 	// Настройка сервера
 	server := &http.Server{
